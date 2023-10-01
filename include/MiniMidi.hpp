@@ -6,6 +6,7 @@
 #include<iostream>
 #include<string>
 #include<iomanip>
+#include<exception>
 #include<cstring>
 
 
@@ -212,21 +213,6 @@ public:
     Message(uint32_t time, const container::Bytes& data) {
         this->time = time;
         this->msgType = status_to_message_type(data[0]);
-
-        /*
-        if(((this->msgType == MessageType::NoteOn ||
-            this->msgType == MessageType::ControlChange ||
-            this->msgType == MessageType::NoteOff ||
-            this->msgType == MessageType::PolyphonicAfterTouch ||
-            this->msgType == MessageType::PitchBend) &&
-            !utils::ensure_range(const_cast<uint8_t*>(&data[1]), 2)) ||
-            ((this->msgType == MessageType::ProgramChange ||
-            this->msgType == MessageType::ChannelAfterTouch ||
-            this->msgType == MessageType::SongSelect) &&
-            !utils::ensure_range(const_cast<uint8_t*>(&data[1]), 1)))
-            throw "Data range must between 0 and 127!";
-        */
-
         this->data = data;
     };
 
@@ -404,7 +390,7 @@ public:
                 messageData = container::Bytes(prevEventLen);
 
                 if(!prevEventLen)
-                    throw "Corrupted MIDI File.";
+                    throw std::ios_base::failure("Corrupted MIDI File.");
 
                 messageData[0] = prevStatusCode;
                 std::copy(cursor, cursor + prevEventLen - 1, messageData.begin() + 1);
@@ -418,7 +404,7 @@ public:
                 prevEventLen = utils::read_variable_length(cursor) + (cursor - prevBuffer);
 
                 if(prevBuffer + prevEventLen > bufferEnd)
-                    throw "Unexpected EOF of Meta Event!";
+                    throw std::ios_base::failure("Unexpected EOF of Meta Event!");
 
                 messageData = std::vector(prevBuffer, prevBuffer + prevEventLen);
                 cursor += prevEventLen - (cursor - prevBuffer);
@@ -431,7 +417,7 @@ public:
                 prevEventLen = utils::read_variable_length(cursor) + (cursor - prevBuffer);
 
                 if(prevBuffer + prevEventLen > bufferEnd)
-                    throw "Unexpected EOF of SysEx Event!";
+                    throw std::ios_base::failure("Unexpected EOF of SysEx Event!");
 
                 messageData = std::vector(prevBuffer, prevBuffer + prevEventLen);
                 cursor += prevEventLen - (cursor - prevBuffer);
@@ -446,7 +432,7 @@ public:
             }
 
             if(cursor > bufferEnd) {
-                throw "Unexpected EOF in track.";
+                throw std::ios_base::failure("Unexpected EOF in track.");
             }
 
             message::Message msg = message::Message(tickOffset, messageData);
@@ -516,7 +502,7 @@ inline MidiFormat read_midiformat(uint16_t data) {
         #undef MIDI_FORMAT_MEMBER
     }
 
-    throw "Invaild midi format!";
+    throw std::ios_base::failure("Invaild midi format!");
 };
 
 class MidiFile {
@@ -533,7 +519,7 @@ public:
     MidiFile() = default;
     MidiFile(const container::Bytes& data) {
         if(data.size() < 4)
-            throw "Invaild midi file!";
+            throw std::ios_base::failure("Invaild midi file!");
 
         uint8_t* cursor = const_cast<uint8_t*>(data.data());
         uint8_t* bufferEnd = cursor + data.size();
@@ -541,7 +527,7 @@ public:
         if(!(!strncmp(reinterpret_cast<const char*>(cursor), "MThd", 4) &&
             utils::read_msb_bytes(cursor + 4, 4) == 6
             ))
-            throw "MThd excepted!";
+            throw std::ios_base::failure("Invaild midi file!");
 
         this->format = read_midiformat(utils::read_msb_bytes(cursor + 8, 2));
         uint16_t trackNum = utils::read_msb_bytes(cursor + 10, 2);
@@ -562,7 +548,7 @@ public:
             size_t chunkLen = utils::read_msb_bytes(cursor + 4, 4);
 
             if(cursor + chunkLen + 8 > bufferEnd)
-                throw "Unexpected EOF in file!";
+                throw std::ios_base::failure("Unexpected EOF in file!");
 
             this->tracks.emplace_back(track::Track(container::Bytes(cursor + 8, cursor + 8 + chunkLen)));
             cursor += (8 + chunkLen);
@@ -573,7 +559,7 @@ public:
         FILE* filePtr = fopen(filepath.c_str(), "rb");
 
         if(!filePtr)
-            throw "Reading file failed!";
+            throw std::ios_base::failure("Reading file failed!");
 
         fseek(filePtr, 0, SEEK_END);
         size_t fileLen = ftell(filePtr);
