@@ -1,3 +1,6 @@
+#ifndef __MINIMIDI_HPP
+#define __MINIMIDI_HPP
+
 #include<cstdint>
 #include<cstddef>
 #include <utility>
@@ -646,3 +649,6 @@ std::ostream &operator<<(std::ostream &out, MidiFile &file) {
 }
 
 }
+
+
+#endif
